@@ -1,9 +1,9 @@
 """FastAPI Router for User Registration, Authentication, and Session Profile."""
 
 from datetime import timedelta
+import re
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status
-# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -86,8 +86,28 @@ def register_user(
     # 6. Community & Household/Unit assignment
     assigned_comm = request.community.strip() if request.community else "Green Valley Community"
     assigned_unit = request.unit.strip() if request.unit else "A-204"
-    clean_unit_id = assigned_unit.replace(" ", "-").replace("/", "-").upper()
-    assigned_hh_id = request.household_id.strip() if request.household_id else f"HH-{clean_unit_id}"
+
+    # Assign a valid deterministic simulation fleet household ID (HH-001 through HH-100)
+    raw_hh_req = request.household_id.strip() if request.household_id else None
+    if raw_hh_req:
+        digits = re.findall(r"\d+", raw_hh_req)
+        if digits:
+            num = int(digits[0])
+            mapped_num = ((num - 1) % 100) + 1
+            assigned_hh_id = f"HH-{mapped_num:03d}"
+        else:
+            h_val = sum(ord(c) for c in raw_hh_req)
+            assigned_hh_id = f"HH-{(h_val % 100) + 1:03d}"
+    else:
+        # Derive deterministically from assigned unit, or username
+        digits = re.findall(r"\d+", assigned_unit)
+        if digits:
+            num = int(digits[0])
+            mapped_num = ((num - 1) % 100) + 1
+            assigned_hh_id = f"HH-{mapped_num:03d}"
+        else:
+            h_val = sum(ord(c) for c in request.username.strip())
+            assigned_hh_id = f"HH-{(h_val % 100) + 1:03d}"
 
     # 7. Create and persist user in database
     new_user = User(

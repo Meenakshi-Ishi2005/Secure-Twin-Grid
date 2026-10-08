@@ -24,6 +24,7 @@ export default function BlockchainPage({
   simulationStatus,
   blockchainSummary,
   blockchainBlocks,
+  currentUser,
   onStartSimulation,
   onStopSimulation,
   onResetSimulation,
@@ -34,6 +35,7 @@ export default function BlockchainPage({
   onToggleAutoPlay,
   onSelectHouseholdById
 }) {
+  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
   const blocks = blockchainBlocks?.blocks || [];
   const totalBlocks = blockchainSummary?.chain_length || blocks.length;
   const totalTxs = blockchainSummary?.total_transactions || blocks.reduce((acc, b) => acc + (b.transactions?.length || 0), 0);
@@ -78,6 +80,7 @@ export default function BlockchainPage({
         isOperating={isOperating}
         autoPlaying={autoPlaying}
         onToggleAutoPlay={onToggleAutoPlay}
+        currentUser={currentUser}
       />
 
       {/* Header Banner */}
@@ -97,14 +100,16 @@ export default function BlockchainPage({
           </p>
         </div>
 
-        <button
-          onClick={onValidateBlockchain}
-          disabled={isOperating}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-slate-950 text-xs font-bold shadow-lg shadow-emerald-950/40 border border-emerald-500/40 transition disabled:opacity-50 self-start md:self-auto"
-        >
-          <ShieldCheck className="w-4 h-4 text-slate-950" />
-          <span>Validate Blockchain</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onValidateBlockchain}
+            disabled={isOperating}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-slate-950 text-xs font-bold shadow-lg shadow-emerald-950/40 border border-emerald-500/40 transition disabled:opacity-50 self-start md:self-auto"
+          >
+            <ShieldCheck className="w-4 h-4 text-slate-950" />
+            <span>Validate Blockchain</span>
+          </button>
+        )}
       </div>
 
       {/* 3 Clean KPI Cards */}

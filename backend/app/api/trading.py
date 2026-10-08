@@ -16,12 +16,13 @@ trading_router = APIRouter(prefix="/trading", tags=["Trading"])
     "",
     response_model=TradeListResponse,
     summary="List P2P Trades",
-    description="Retrieve all executed peer-to-peer electricity trades, with optional filtering by seller/buyer and pagination.",
+    description="Retrieve all executed peer-to-peer electricity trades, with optional filtering by seller/buyer/household and pagination.",
 )
 def list_trades(
     seller_id: Optional[str] = Query(None, description="Filter trades by seller household ID"),
     buyer_id: Optional[str] = Query(None, description="Filter trades by buyer household ID"),
-    limit: int = Query(default=100, ge=1, le=1000, description="Max trades to return"),
+    household_id: Optional[str] = Query(None, description="Filter trades where household is buyer or seller"),
+    limit: int = Query(default=100, ge=1, le=10000, description="Max trades to return"),
     offset: int = Query(default=0, ge=0, description="Number of trades to skip"),
     service: SimulationService = Depends(get_simulation_service),
 ) -> TradeListResponse:
@@ -30,6 +31,7 @@ def list_trades(
         offset=offset,
         seller_id=seller_id,
         buyer_id=buyer_id,
+        household_id=household_id,
     )
     items = [TradeResponse(**t.to_dict()) for t in paginated_trades]
     return TradeListResponse(

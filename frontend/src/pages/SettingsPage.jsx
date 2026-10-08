@@ -112,7 +112,7 @@ export default function SettingsPage({ currentUser, onOpenAuthModal, showNotific
               <div className="flex justify-between text-slate-400">
                 <span>Community Node</span>
                 <span className="text-slate-200 font-mono">
-                  {currentUser?.household_id || 'Home 14 (Prosumer)'}
+                  {currentUser?.household_id ? currentUser.household_id.replace('HH-', 'Home ') : 'Not Assigned'}
                 </span>
               </div>
               <div className="flex justify-between text-slate-400">

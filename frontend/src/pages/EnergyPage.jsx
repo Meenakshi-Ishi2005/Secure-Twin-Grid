@@ -250,6 +250,7 @@ export default function EnergyPage({
         isOperating={isOperating}
         autoPlaying={autoPlaying}
         onToggleAutoPlay={onToggleAutoPlay}
+        currentUser={currentUser}
       />
 
       {/* Header Banner */}
@@ -284,7 +285,7 @@ export default function EnergyPage({
                 </option>
               ))
             ) : (
-              <option value="HH-014">Home 014</option>
+              <option value={myHouseholdId}>{myHouseholdId ? myHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
             )}
           </select>
         </div>

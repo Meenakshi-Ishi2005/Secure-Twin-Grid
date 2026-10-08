@@ -442,3 +442,87 @@ class TestClosedCommunityAndApprovalWorkflow:
         assert reject_res.status_code == 200
         assert reject_res.json()["status"] == "REJECTED"
         assert reject_res.json()["approval_status"] == "REJECTED"
+
+
+class TestHouseholdMapping:
+    """Tests for deterministic, distinct User -> Simulation Household fleet mapping."""
+
+    def test_distinct_users_assigned_distinct_simulation_households(self, client):
+        # Register User A (Unit A-204)
+        res_a = client.post(
+            "/api/auth/register",
+            json={
+                "username": "user_alpha",
+                "email": "alpha@example.com",
+                "password": "Password12345!",
+                "unit": "Building A / A-204",
+            },
+        )
+        assert res_a.status_code == 201
+        hh_a = res_a.json()["user"]["household_id"]
+        assert hh_a == "HH-004"
+
+        # Register User B (Unit B-102)
+        res_b = client.post(
+            "/api/auth/register",
+            json={
+                "username": "user_beta",
+                "email": "beta@example.com",
+                "password": "Password12345!",
+                "unit": "Building B / B-102",
+            },
+        )
+        assert res_b.status_code == 201
+        hh_b = res_b.json()["user"]["household_id"]
+        assert hh_b == "HH-002"
+
+        # Verify User A and User B have different households
+        assert hh_a != hh_b
+
+        # Verify explicit household_id assignment
+        res_c = client.post(
+            "/api/auth/register",
+            json={
+                "username": "user_gamma",
+                "email": "gamma@example.com",
+                "password": "Password12345!",
+                "household_id": "HH-042",
+            },
+        )
+        assert res_c.status_code == 201
+        assert res_c.json()["user"]["household_id"] == "HH-042"
+
+    def test_login_preserves_stable_assigned_household(self, client):
+        # Register User
+        client.post(
+            "/api/auth/register",
+            json={
+                "username": "stable_user",
+                "email": "stable@example.com",
+                "password": "Password12345!",
+                "unit": "Building C / C-308",
+            },
+        )
+
+        # First Login
+        login_1 = client.post(
+            "/api/auth/login",
+            json={"username": "stable_user", "password": "Password12345!"},
+        )
+        assert login_1.status_code == 200
+        hh_first = login_1.json()["user"]["household_id"]
+        token_1 = login_1.json()["access_token"]
+
+        me_1 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_1}"})
+        assert me_1.json()["household_id"] == hh_first
+        assert hh_first == "HH-008"
+
+        # Second Login (Simulate re-login after logout)
+        login_2 = client.post(
+            "/api/auth/login",
+            json={"username": "stable_user", "password": "Password12345!"},
+        )
+        assert login_2.status_code == 200
+        hh_second = login_2.json()["user"]["household_id"]
+        assert hh_first == hh_second
+

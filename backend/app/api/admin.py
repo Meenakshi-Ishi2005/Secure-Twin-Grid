@@ -642,15 +642,21 @@ def get_audit_logs(
 )
 def admin_start_simulation(
     steps: Optional[int] = Query(None, ge=1, le=96),
+    continuous: Optional[bool] = Query(None),
+    speed_ms: Optional[int] = Query(1000, ge=100, le=10000),
     current_admin: User = Depends(get_current_admin),
     sim_service: SimulationService = Depends(get_simulation_service),
     audit_service: AuditService = Depends(get_audit_service),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    res = sim_service.start(steps=steps, run_trading=True)
+    if continuous or (steps is None and continuous is not False):
+        step_delay = (speed_ms or 1000) / 1000.0
+        res = sim_service.start_continuous(step_delay=step_delay, run_trading=True)
+    else:
+        res = sim_service.start(steps=steps, run_trading=True)
     audit_service.record(
         action="SIMULATION_START",
-        target=f"Microgrid Digital Twin (steps={steps or 'ALL'})",
+        target=f"Microgrid Digital Twin (steps={steps or 'CONTINUOUS'})",
         admin_id=str(current_admin.id),
         admin_username=current_admin.username,
         result="SUCCESS",

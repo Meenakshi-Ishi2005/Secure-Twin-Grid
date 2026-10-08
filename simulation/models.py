@@ -39,6 +39,8 @@ class Household:
     current_surplus_kwh: float = 0.0
     current_deficit_kwh: float = 0.0
     status: str = "BALANCED"
+    selling_enabled: bool = True
+    buying_enabled: bool = True
 
     def charge_battery(self, energy_kwh: float) -> float:
         """Charge the stationary battery with available surplus energy.
@@ -106,6 +108,8 @@ class Household:
             "current_surplus_kwh": round(self.current_surplus_kwh, 3),
             "current_deficit_kwh": round(self.current_deficit_kwh, 3),
             "status": self.status,
+            "selling_enabled": getattr(self, "selling_enabled", True),
+            "buying_enabled": getattr(self, "buying_enabled", True),
         }
 
 

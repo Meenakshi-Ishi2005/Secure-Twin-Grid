@@ -21,7 +21,12 @@ export default function SimulationControls({
   isOperating,
   autoPlaying,
   onToggleAutoPlay,
+  currentUser,
 }) {
+  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+  if (!isAdmin) {
+    return null;
+  }
   const currentStep = simulationStatus?.current_step ?? 0;
   const totalSteps = simulationStatus?.total_steps ?? 96;
   const currentTime = simulationStatus?.current_time || '00:00';

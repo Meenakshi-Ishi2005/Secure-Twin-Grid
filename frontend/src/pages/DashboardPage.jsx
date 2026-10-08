@@ -49,6 +49,7 @@ export default function DashboardPage({
   autoPlaying,
   onToggleAutoPlay,
   setActiveTab,
+  onNavigateToTrading,
   onSelectHouseholdById,
   onSelectBlock
 }) {
@@ -310,6 +311,7 @@ export default function DashboardPage({
         isOperating={isOperating}
         autoPlaying={autoPlaying}
         onToggleAutoPlay={onToggleAutoPlay}
+        currentUser={currentUser}
       />
 
       {/* Software Simulation Context Bar */}
@@ -347,7 +349,7 @@ export default function DashboardPage({
                   </option>
                 ))
               ) : (
-                <option value="HH-014">Home 014 (Prosumer)</option>
+                <option value={myHouseholdId}>{myHouseholdId ? myHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
               )}
             </select>
           </div>
@@ -463,8 +465,11 @@ export default function DashboardPage({
             ) : isMyDeficit ? (
               <button
                 onClick={() => {
-                  setTradeViewMode('all');
-                  setActiveTab && setActiveTab('trading');
+                  if (onNavigateToTrading) {
+                    onNavigateToTrading('sellers');
+                  } else if (setActiveTab) {
+                    setActiveTab('trading');
+                  }
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-950/40 transition"
               >
@@ -708,7 +713,7 @@ export default function DashboardPage({
             </div>
           ) : (
             <div className="py-6 text-center text-xs text-slate-500">
-              No live trading activity in this step. Click <strong>Step (+15m)</strong> or <strong>Start Simulation</strong> to generate trades.
+              No live trading activity in this interval. Trading activity is generated automatically as the community simulation advances.
             </div>
           )}
         </div>
@@ -860,11 +865,11 @@ export default function DashboardPage({
                       <ArrowLeftRight className="w-8 h-8 text-slate-600" />
                       <p className="text-sm font-medium text-slate-400">
                         {tradeViewMode === 'my'
-                          ? `No trades recorded for ${myHouseholdId?.replace('HH-', 'Home ')} yet.`
+                          ? `No completed trades recorded for ${myHouseholdId?.replace('HH-', 'Home ')} yet.`
                           : 'No completed community trades yet.'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Click <strong>Start Simulation</strong> or <strong>Step (+15m)</strong> in the top controls to simulate peer trading.
+                        Trading activity is recorded on blockchain automatically as the simulation advances.
                       </p>
                     </div>
                   </td>

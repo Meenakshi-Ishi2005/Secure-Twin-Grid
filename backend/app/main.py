@@ -100,6 +100,23 @@ def _migrate_and_seed_db():
             elif prosumer_user.household_id in (None, "HH-001", "HH-014-PROSUMER"):
                 prosumer_user.household_id = "HH-014"
                 db.commit()
+
+            # Normalize legacy household IDs for existing registered users to valid simulation fleet IDs
+            import re
+            all_users = db.query(User).all()
+            for u in all_users:
+                if u.household_id and (u.household_id.startswith("HH-BUILDING-") or not re.match(r"^HH-\d{3}$", u.household_id)):
+                    if u.role == UserRole.ADMIN.value:
+                        continue
+                    digits = re.findall(r"\d+", u.household_id or u.unit or "")
+                    if digits:
+                        num = int(digits[0])
+                        mapped_num = ((num - 1) % 100) + 1
+                        u.household_id = f"HH-{mapped_num:03d}"
+                    else:
+                        h_val = sum(ord(c) for c in (u.username or "user"))
+                        u.household_id = f"HH-{(h_val % 100) + 1:03d}"
+            db.commit()
         finally:
             db.close()
     except Exception as exc:

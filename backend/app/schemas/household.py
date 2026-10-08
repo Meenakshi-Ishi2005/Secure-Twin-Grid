@@ -21,6 +21,8 @@ class HouseholdResponse(BaseModel):
     current_surplus_kwh: float = Field(..., description="Net surplus energy available to sell in current interval")
     current_deficit_kwh: float = Field(..., description="Net deficit energy required to buy in current interval")
     status: str = Field(..., description="Trading status: SELLING, BUYING, or BALANCED")
+    selling_enabled: bool = Field(True, description="Whether surplus sharing/selling is enabled")
+    buying_enabled: bool = Field(True, description="Whether energy buying is enabled")
 
 
 class HouseholdListResponse(BaseModel):

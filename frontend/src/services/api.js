@@ -246,8 +246,18 @@ export const api = {
     const qs = queryParams.toString();
     return fetchJson(`/api/v1/admin/audit-logs${qs ? `?${qs}` : ''}`);
   },
-  adminStartSimulation: (steps = null) => {
-    const query = steps ? `?steps=${steps}` : '';
+  adminStartSimulation: (params = null) => {
+    let query = '';
+    if (typeof params === 'number') {
+      query = `?steps=${params}`;
+    } else if (params && typeof params === 'object') {
+      const qp = new URLSearchParams();
+      if (params.steps !== undefined && params.steps !== null) qp.append('steps', params.steps);
+      if (params.continuous !== undefined) qp.append('continuous', params.continuous);
+      if (params.speed_ms !== undefined) qp.append('speed_ms', params.speed_ms);
+      const qs = qp.toString();
+      if (qs) query = `?${qs}`;
+    }
     return fetchJson(`/api/v1/admin/simulation/start${query}`, { method: 'POST' });
   },
   adminStopSimulation: () => fetchJson('/api/v1/admin/simulation/stop', { method: 'POST' }),

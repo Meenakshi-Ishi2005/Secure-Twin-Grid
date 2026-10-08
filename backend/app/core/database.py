@@ -6,16 +6,33 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Determine if using SQLite or PostgreSQL
+# Determine if using SQLite or PostgreSQL with resilient fallback
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args=connect_args,
-)
+try:
+    engine = create_engine(
+        settings.DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
+    if "postgresql" in settings.DATABASE_URL:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+except Exception as exc:
+    if "postgresql" in settings.DATABASE_URL:
+        logger.warning(
+            f"PostgreSQL connection failed ({exc}). Falling back to local SQLite database at sqlite:///./securetwingrid.db"
+        )
+        settings.DATABASE_URL = "sqlite:///./securetwingrid.db"
+        engine = create_engine(
+            "sqlite:///./securetwingrid.db",
+            pool_pre_ping=True,
+            connect_args={"check_same_thread": False},
+        )
+    else:
+        raise
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

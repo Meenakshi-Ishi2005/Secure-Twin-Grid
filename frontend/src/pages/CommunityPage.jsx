@@ -25,6 +25,7 @@ import SimulationControls from '../components/SimulationControls';
 
 export default function CommunityPage({
   simulationStatus,
+  currentUser,
   onStartSimulation,
   onStopSimulation,
   onResetSimulation,
@@ -125,6 +126,7 @@ export default function CommunityPage({
         isOperating={isOperating}
         autoPlaying={autoPlaying}
         onToggleAutoPlay={onToggleAutoPlay}
+        currentUser={currentUser}
       />
 
       {/* Community Hero Header */}

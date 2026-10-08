@@ -40,11 +40,14 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [registrationResult, setRegistrationResult] = useState(null);
+  const [pendingCredentials, setPendingCredentials] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
   useEffect(() => {
     setIsRegisterMode(initialMode === 'register');
     setError(null);
+    setRegistrationResult(null);
+    setPendingCredentials(null);
   }, [initialMode, isOpen]);
 
   if (!isOpen) return null;
@@ -75,10 +78,7 @@ export default function AuthModal({
 
         const res = await api.register(payload);
         setRegistrationResult(res);
-
-        // Auto-login to establish session for pending status page
-        const loginRes = await api.login({ username: username.trim(), password });
-        onAuthSuccess(loginRes.user);
+        setPendingCredentials({ username: username.trim(), password });
       } else {
         const res = await api.login({
           username: username.trim() || undefined,
@@ -93,6 +93,23 @@ export default function AuthModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAcknowledgeKey = async () => {
+    if (pendingCredentials) {
+      try {
+        setLoading(true);
+        const loginRes = await api.login(pendingCredentials);
+        onAuthSuccess(loginRes.user);
+      } catch (err) {
+        console.warn('Auto-login after registration:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    setRegistrationResult(null);
+    setPendingCredentials(null);
+    onClose();
   };
 
   const copyPrivateKey = () => {
@@ -192,7 +209,7 @@ export default function AuthModal({
                 <p className="text-xs text-slate-400">ECC SECP256R1 (NIST P-256)</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400">
+            <button onClick={handleAcknowledgeKey} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -221,10 +238,11 @@ export default function AuthModal({
           </div>
 
           <button
-            onClick={onClose}
-            className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 font-bold rounded-xl text-xs shadow-lg transition"
+            onClick={handleAcknowledgeKey}
+            disabled={loading}
+            className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl text-xs shadow-lg transition disabled:opacity-50"
           >
-            I Have Saved My Key &bull; Continue to Status Page
+            {loading ? 'Entering Community...' : 'I Have Saved My Key • Continue to Status Page'}
           </button>
         </div>
       </div>

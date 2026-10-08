@@ -50,8 +50,14 @@ export default function App() {
   const [isOperating, setIsOperating] = useState(false);
   const [autoPlaying, setAutoPlaying] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [tradingInitialTab, setTradingInitialTab] = useState('all');
 
   const autoPlayRef = useRef(null);
+
+  const handleNavigateToTrading = (tab = 'all') => {
+    setTradingInitialTab(tab);
+    setActiveTab('trading');
+  };
 
   // Check existing user session on mount
   useEffect(() => {
@@ -130,7 +136,7 @@ export default function App() {
         api.getEnergySummary(),
         api.getEnergyHistory(),
         api.getHouseholds(),
-        api.getTrades({ limit: 500 }),
+        api.getTrades({ limit: 5000 }),
         api.getBlockchainSummary(),
         api.getBlockchainBlocks(),
       ]);
@@ -404,103 +410,107 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
-        {(activeTab === 'home' || activeTab === 'dashboard') && (
-          <DashboardPage
-            simulationStatus={simulationStatus}
-            energySummary={energySummary}
-            energyHistory={energyHistory}
-            householdsData={householdsData}
-            tradesData={tradesData}
-            blockchainSummary={blockchainSummary}
-            blockchainBlocks={blockchainBlocks}
-            currentUser={currentUser}
-            onStartSimulation={handleStartSimulation}
-            onStopSimulation={handleStopSimulation}
-            onResetSimulation={handleResetSimulation}
-            onStepSimulation={handleStepSimulation}
-            isOperating={isOperating}
-            autoPlaying={autoPlaying}
-            onToggleAutoPlay={handleToggleAutoPlay}
-            setActiveTab={setActiveTab}
-            onSelectHouseholdById={handleSelectHouseholdById}
-            onSelectBlock={(b) => setSelectedBlock(b)}
-          />
-        )}
-
-        {activeTab === 'energy' && (
-          <EnergyPage
-            simulationStatus={simulationStatus}
-            energySummary={energySummary}
-            energyHistory={energyHistory}
-            householdsData={householdsData}
-            currentUser={currentUser}
-            onStartSimulation={handleStartSimulation}
-            onStopSimulation={handleStopSimulation}
-            onResetSimulation={handleResetSimulation}
-            onStepSimulation={handleStepSimulation}
-            isOperating={isOperating}
-            autoPlaying={autoPlaying}
-            onToggleAutoPlay={handleToggleAutoPlay}
-            onSelectHouseholdById={handleSelectHouseholdById}
-          />
-        )}
-
-        {activeTab === 'trading' && (
-          <TradingPage
-            simulationStatus={simulationStatus}
-            tradesData={tradesData}
-            householdsData={householdsData}
-            blockchainBlocks={blockchainBlocks}
-            currentUser={currentUser}
-            onStartSimulation={handleStartSimulation}
-            onStopSimulation={handleStopSimulation}
-            onResetSimulation={handleResetSimulation}
-            onStepSimulation={handleStepSimulation}
-            onRunTradingAuction={handleRunTradingAuction}
-            isOperating={isOperating}
-            autoPlaying={autoPlaying}
-            onToggleAutoPlay={handleToggleAutoPlay}
-            onSelectHouseholdById={handleSelectHouseholdById}
-            onSelectBlock={(b) => setSelectedBlock(b)}
-          />
-        )}
-
-        {(activeTab === 'records' || activeTab === 'blockchain') && (
-          <BlockchainPage
-            simulationStatus={simulationStatus}
-            blockchainSummary={blockchainSummary}
-            blockchainBlocks={blockchainBlocks}
-            onStartSimulation={handleStartSimulation}
-            onStopSimulation={handleStopSimulation}
-            onResetSimulation={handleResetSimulation}
-            onStepSimulation={handleStepSimulation}
-            onValidateBlockchain={handleValidateBlockchain}
-            isOperating={isOperating}
-            autoPlaying={autoPlaying}
-            onToggleAutoPlay={handleToggleAutoPlay}
-            onSelectHouseholdById={handleSelectHouseholdById}
-          />
-        )}
-
-        {activeTab === 'security' && (
-          <SecurityPage />
-        )}
-
-        {activeTab === 'settings' && (
-          <SettingsPage
-            currentUser={currentUser}
-            onOpenAuthModal={() => setIsAuthModalOpen(true)}
-            showNotification={showNotification}
-          />
-        )}
-
-        {activeTab === 'admin' && (
+        {userRole === 'ADMIN' ? (
           <AdminDashboard
             currentUser={currentUser}
-            onSwitchToParticipant={() => setActiveTab('home')}
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
             showNotification={showNotification}
           />
+        ) : (
+          <>
+            {(activeTab === 'home' || activeTab === 'dashboard') && (
+              <DashboardPage
+                simulationStatus={simulationStatus}
+                energySummary={energySummary}
+                energyHistory={energyHistory}
+                householdsData={householdsData}
+                tradesData={tradesData}
+                blockchainSummary={blockchainSummary}
+                blockchainBlocks={blockchainBlocks}
+                currentUser={currentUser}
+                onStartSimulation={handleStartSimulation}
+                onStopSimulation={handleStopSimulation}
+                onResetSimulation={handleResetSimulation}
+                onStepSimulation={handleStepSimulation}
+                isOperating={isOperating}
+                autoPlaying={autoPlaying}
+                onToggleAutoPlay={handleToggleAutoPlay}
+                setActiveTab={setActiveTab}
+                onNavigateToTrading={handleNavigateToTrading}
+                onSelectHouseholdById={handleSelectHouseholdById}
+                onSelectBlock={(b) => setSelectedBlock(b)}
+              />
+            )}
+
+            {activeTab === 'energy' && (
+              <EnergyPage
+                simulationStatus={simulationStatus}
+                energySummary={energySummary}
+                energyHistory={energyHistory}
+                householdsData={householdsData}
+                currentUser={currentUser}
+                onStartSimulation={handleStartSimulation}
+                onStopSimulation={handleStopSimulation}
+                onResetSimulation={handleResetSimulation}
+                onStepSimulation={handleStepSimulation}
+                isOperating={isOperating}
+                autoPlaying={autoPlaying}
+                onToggleAutoPlay={handleToggleAutoPlay}
+                onSelectHouseholdById={handleSelectHouseholdById}
+              />
+            )}
+
+            {activeTab === 'trading' && (
+              <TradingPage
+                simulationStatus={simulationStatus}
+                tradesData={tradesData}
+                householdsData={householdsData}
+                blockchainBlocks={blockchainBlocks}
+                currentUser={currentUser}
+                initialTab={tradingInitialTab}
+                onStartSimulation={handleStartSimulation}
+                onStopSimulation={handleStopSimulation}
+                onResetSimulation={handleResetSimulation}
+                onStepSimulation={handleStepSimulation}
+                onRunTradingAuction={handleRunTradingAuction}
+                isOperating={isOperating}
+                autoPlaying={autoPlaying}
+                onToggleAutoPlay={handleToggleAutoPlay}
+                onSelectHouseholdById={handleSelectHouseholdById}
+                onSelectBlock={(b) => setSelectedBlock(b)}
+              />
+            )}
+
+            {(activeTab === 'records' || activeTab === 'blockchain') && (
+              <BlockchainPage
+                simulationStatus={simulationStatus}
+                blockchainSummary={blockchainSummary}
+                blockchainBlocks={blockchainBlocks}
+                currentUser={currentUser}
+                onStartSimulation={handleStartSimulation}
+                onStopSimulation={handleStopSimulation}
+                onResetSimulation={handleResetSimulation}
+                onStepSimulation={handleStepSimulation}
+                onValidateBlockchain={handleValidateBlockchain}
+                isOperating={isOperating}
+                autoPlaying={autoPlaying}
+                onToggleAutoPlay={handleToggleAutoPlay}
+                onSelectHouseholdById={handleSelectHouseholdById}
+              />
+            )}
+
+            {activeTab === 'security' && (
+              <SecurityPage />
+            )}
+
+            {activeTab === 'settings' && (
+              <SettingsPage
+                currentUser={currentUser}
+                onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                showNotification={showNotification}
+              />
+            )}
+          </>
         )}
       </main>
 

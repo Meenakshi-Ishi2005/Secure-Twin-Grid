@@ -1,6 +1,7 @@
 import sys
 import os
 import threading
+import time
 from typing import List, Dict, Optional, Tuple, Any
 
 # Ensure project root is in sys.path
@@ -23,6 +24,9 @@ class SimulationService:
 
     def __init__(self, num_households: int = 100, random_seed: int = 42):
         self._lock = threading.RLock()
+        self._stop_event = threading.Event()
+        self._bg_thread: Optional[threading.Thread] = None
+        self.step_delay: float = 1.0  # seconds per 15-minute simulated step
         self.num_households = num_households
         self.random_seed = random_seed
         self.engine = SimulationEngine(
@@ -41,34 +45,113 @@ class SimulationService:
         self.is_running: bool = False
         self._execution_status: str = "INITIALIZED"
 
-
     def get_status(self) -> Dict:
         """Return the current operational status of the simulation engine."""
         with self._lock:
-            current_step = self.engine.current_step
+            return self.get_status_locked()
+
+    def get_status_locked(self) -> Dict:
+        current_step = self.engine.current_step
+        total_steps = self.engine.config.total_steps
+        total_minutes = current_step * self.engine.config.interval_minutes
+        hour_of_day = (total_minutes / 60.0) % 24.0
+        time_hours = int(hour_of_day)
+        time_mins = int((hour_of_day - time_hours) * 60)
+        current_time = f"{time_hours:02d}:{time_mins:02d}"
+
+        status_str = self._execution_status
+        if current_step >= total_steps:
+            status_str = "COMPLETED"
+            self.is_running = False
+        elif self._bg_thread and self._bg_thread.is_alive() and not self._stop_event.is_set():
+            status_str = "RUNNING"
+            self.is_running = True
+
+        return {
+            "status": status_str,
+            "current_step": current_step,
+            "total_steps": total_steps,
+            "current_time": current_time,
+            "hour_of_day": round(hour_of_day, 2),
+            "num_households": len(self.engine.households),
+            "interval_minutes": self.engine.config.interval_minutes,
+            "duration_hours": self.engine.config.duration_hours,
+            "total_trades_count": len(self.trades),
+            "is_running": self.is_running,
+        }
+
+    def start_continuous(self, step_delay: float = 1.0, run_trading: bool = True) -> Dict:
+        """Start or resume the background simulation worker thread so it runs continuously on the server."""
+        with self._lock:
             total_steps = self.engine.config.total_steps
-            total_minutes = current_step * self.engine.config.interval_minutes
-            hour_of_day = (total_minutes / 60.0) % 24.0
-            time_hours = int(hour_of_day)
-            time_mins = int((hour_of_day - time_hours) * 60)
-            current_time = f"{time_hours:02d}:{time_mins:02d}"
+            if self.engine.current_step >= total_steps:
+                status_info = self.get_status_locked()
+                return {
+                    "message": "Simulation is already completed for the 24-hour duration. Reset to run again.",
+                    "status": "COMPLETED",
+                    "current_step": status_info["current_step"],
+                    "current_time": status_info["current_time"],
+                    "details": {"steps_advanced": 0, "trades_cleared": 0},
+                }
 
-            status_str = self._execution_status
-            if current_step >= total_steps:
-                status_str = "COMPLETED"
+            self.step_delay = max(0.1, step_delay)
+            self._stop_event.clear()
+            self.is_running = True
+            self._execution_status = "RUNNING"
 
+            if self._bg_thread is None or not self._bg_thread.is_alive():
+                self._bg_thread = threading.Thread(
+                    target=self._background_worker,
+                    args=(run_trading,),
+                    daemon=True,
+                    name="MicrogridSimulationWorker",
+                )
+                self._bg_thread.start()
+
+            status_info = self.get_status_locked()
             return {
-                "status": status_str,
-                "current_step": current_step,
-                "total_steps": total_steps,
-                "current_time": current_time,
-                "hour_of_day": round(hour_of_day, 2),
-                "num_households": len(self.engine.households),
-                "interval_minutes": self.engine.config.interval_minutes,
-                "duration_hours": self.engine.config.duration_hours,
-                "total_trades_count": len(self.trades),
-                "is_running": self.is_running,
+                "message": "Global continuous simulation started successfully.",
+                "status": "RUNNING",
+                "current_step": status_info["current_step"],
+                "current_time": status_info["current_time"],
+                "details": {
+                    "step_delay_seconds": self.step_delay,
+                    "is_running": True,
+                },
             }
+
+    def _background_worker(self, run_trading: bool = True) -> None:
+        """Daemon worker loop advancing simulation steps at configured step_delay."""
+        while not self._stop_event.is_set():
+            if self._stop_event.wait(timeout=self.step_delay):
+                break
+
+            with self._lock:
+                total_steps = self.engine.config.total_steps
+                if self.engine.current_step >= total_steps:
+                    self.is_running = False
+                    self._execution_status = "COMPLETED"
+                    break
+
+                step_summary = self.engine.step()
+                if run_trading:
+                    new_trades, _ = self.matcher.execute_simulation_interval(
+                        households=self.engine.households,
+                        timestamp=step_summary.time_str,
+                        default_seller_ask=0.10,
+                        default_buyer_bid=0.18,
+                        price_noise=True,
+                        random_seed=42 + step_summary.step,
+                    )
+                    for trade in new_trades:
+                        self.trades.append(trade)
+                        self.trades_by_id[trade.trade_id] = trade
+                    self.settlement.settle_trades(new_trades)
+
+                if self.engine.current_step >= total_steps:
+                    self.is_running = False
+                    self._execution_status = "COMPLETED"
+                    break
 
     def start(
         self,
@@ -76,11 +159,17 @@ class SimulationService:
         run_trading: bool = True,
         num_households: Optional[int] = None,
         random_seed: Optional[int] = None,
+        continuous: bool = False,
+        step_delay: float = 1.0,
     ) -> Dict:
         """Start or advance the digital twin simulation.
         
-        If steps is None, advances through all remaining steps in the 24-hour cycle.
+        If continuous is True, starts background server daemon loop.
+        If steps is provided, advances specified number of steps synchronously.
         """
+        if continuous or (steps is None and continuous is not False and not steps):
+            return self.start_continuous(step_delay=step_delay, run_trading=run_trading)
+
         with self._lock:
             # Reinitialize if parameters changed
             if (num_households is not None and num_households != self.num_households) or (
@@ -95,7 +184,6 @@ class SimulationService:
             remaining_steps = max(0, total_steps - self.engine.current_step)
 
             if remaining_steps == 0:
-                # If already at the end of the simulation, cycle is complete
                 status_info = self.get_status_locked()
                 return {
                     "message": "Simulation is already completed for the 24-hour duration. Reset to run again.",
@@ -107,8 +195,6 @@ class SimulationService:
 
             steps_to_advance = min(steps, remaining_steps) if steps is not None else remaining_steps
             new_trades_count = 0
-            self.is_running = True
-            self._execution_status = "RUNNING"
 
             for _ in range(steps_to_advance):
                 step_summary = self.engine.step()
@@ -131,8 +217,12 @@ class SimulationService:
                 self.is_running = False
                 self._execution_status = "COMPLETED"
             else:
-                self.is_running = False
-                self._execution_status = "STOPPED"
+                if self._bg_thread and self._bg_thread.is_alive() and not self._stop_event.is_set():
+                    self.is_running = True
+                    self._execution_status = "RUNNING"
+                else:
+                    self.is_running = False
+                    self._execution_status = "STOPPED"
 
             status_info = self.get_status_locked()
             return {
@@ -150,6 +240,7 @@ class SimulationService:
     def stop(self) -> Dict:
         """Pause / stop simulation execution."""
         with self._lock:
+            self._stop_event.set()
             self.is_running = False
             if self._execution_status != "COMPLETED":
                 self._execution_status = "STOPPED"
@@ -185,6 +276,7 @@ class SimulationService:
             }
 
     def _reset_internal(self, num_households: int, random_seed: int) -> None:
+        self._stop_event.set()
         self.num_households = num_households
         self.random_seed = random_seed
         self.engine = SimulationEngine(
@@ -202,32 +294,6 @@ class SimulationService:
         self.trades_by_id.clear()
         self.is_running = False
         self._execution_status = "INITIALIZED"
-
-    def get_status_locked(self) -> Dict:
-        current_step = self.engine.current_step
-        total_steps = self.engine.config.total_steps
-        total_minutes = current_step * self.engine.config.interval_minutes
-        hour_of_day = (total_minutes / 60.0) % 24.0
-        time_hours = int(hour_of_day)
-        time_mins = int((hour_of_day - time_hours) * 60)
-        current_time = f"{time_hours:02d}:{time_mins:02d}"
-
-        status_str = self._execution_status
-        if current_step >= total_steps:
-            status_str = "COMPLETED"
-
-        return {
-            "status": status_str,
-            "current_step": current_step,
-            "total_steps": total_steps,
-            "current_time": current_time,
-            "hour_of_day": round(hour_of_day, 2),
-            "num_households": len(self.engine.households),
-            "interval_minutes": self.engine.config.interval_minutes,
-            "duration_hours": self.engine.config.duration_hours,
-            "total_trades_count": len(self.trades),
-            "is_running": self.is_running,
-        }
 
     def get_households(self, status_filter: Optional[str] = None) -> List[Household]:
         """Retrieve virtual households, optionally filtered by trading status."""
@@ -306,16 +372,24 @@ class SimulationService:
         offset: int = 0,
         seller_id: Optional[str] = None,
         buyer_id: Optional[str] = None,
+        household_id: Optional[str] = None,
     ) -> Tuple[List[Trade], int, float, float]:
         """Retrieve trades with optional filtering and pagination."""
         with self._lock:
             filtered = self.trades
+            if household_id:
+                h_target = household_id.strip().upper()
+                filtered = [
+                    t for t in filtered
+                    if (getattr(t, "seller_id", None) and t.seller_id.upper() == h_target)
+                    or (getattr(t, "buyer_id", None) and t.buyer_id.upper() == h_target)
+                ]
             if seller_id:
                 s_target = seller_id.strip().upper()
-                filtered = [t for t in filtered if t.seller_id.upper() == s_target]
+                filtered = [t for t in filtered if getattr(t, "seller_id", None) and t.seller_id.upper() == s_target]
             if buyer_id:
                 b_target = buyer_id.strip().upper()
-                filtered = [t for t in filtered if t.buyer_id.upper() == b_target]
+                filtered = [t for t in filtered if getattr(t, "buyer_id", None) and t.buyer_id.upper() == b_target]
 
             total_count = len(filtered)
             total_vol = round(sum(t.energy_kwh for t in filtered), 4)

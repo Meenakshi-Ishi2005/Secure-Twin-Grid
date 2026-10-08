@@ -161,8 +161,20 @@ class DoubleAuctionMatcher:
 
         for hh in households:
             hh_comm = getattr(hh, "community_id", "COMM-001")
-            # Sellers: households with positive net surplus
-            if hh.current_surplus_kwh > 1e-4:
+
+            # Extract participation settings with resilient backward-compatible fallback
+            selling_flag = getattr(hh, "selling_enabled", None)
+            if selling_flag is None:
+                selling_flag = getattr(hh, "share_surplus_enabled", True)
+            selling_enabled = bool(selling_flag)
+
+            buying_flag = getattr(hh, "buying_enabled", None)
+            if buying_flag is None:
+                buying_flag = getattr(hh, "buy_community_energy_enabled", True)
+            buying_enabled = bool(buying_flag)
+
+            # Sellers: households with positive net surplus AND selling enabled
+            if hh.current_surplus_kwh > 1e-4 and selling_enabled:
                 ask_price = default_seller_ask
                 if price_noise:
                     ask_price = round(default_seller_ask + rng.uniform(-0.02, 0.02), 4)
@@ -175,8 +187,8 @@ class DoubleAuctionMatcher:
                 )
                 order_book.add_offer(offer)
 
-            # Buyers: households with positive net deficit
-            elif hh.current_deficit_kwh > 1e-4:
+            # Buyers: households with positive net deficit AND buying enabled
+            elif hh.current_deficit_kwh > 1e-4 and buying_enabled:
                 bid_price = default_buyer_bid
                 if price_noise:
                     bid_price = round(default_buyer_bid + rng.uniform(-0.02, 0.02), 4)
