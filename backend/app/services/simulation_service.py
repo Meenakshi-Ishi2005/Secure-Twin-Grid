@@ -37,12 +37,25 @@ class SimulationService:
                 random_seed=random_seed,
             )
         )
+        self._ensure_prosumer_households()
         self.matcher = DoubleAuctionMatcher()
         self.blockchain = Blockchain(validator_id="poa-validator-primary")
         self.settlement = SettlementEngine(blockchain=self.blockchain)
         self.trades: List[Trade] = []
         self.trades_by_id: Dict[str, Trade] = {}
         self.is_running: bool = False
+
+    def _ensure_prosumer_households(self) -> None:
+        """Ensure designated user prosumer households (HH-001 and HH-006) have solar PV and battery storage."""
+        for hh in self.engine.households:
+            if hh.household_id in ("HH-001", "HH-006"):
+                if not hh.has_solar or hh.solar_capacity_kw <= 0:
+                    hh.has_solar = True
+                    hh.solar_capacity_kw = 5.25
+                if not hh.has_battery or hh.battery_capacity_kwh <= 0:
+                    hh.has_battery = True
+                    hh.battery_capacity_kwh = 9.50
+                    hh.battery_level_kwh = 4.75
         self._execution_status: str = "INITIALIZED"
 
     def get_status(self) -> Dict:
@@ -85,14 +98,11 @@ class SimulationService:
         with self._lock:
             total_steps = self.engine.config.total_steps
             if self.engine.current_step >= total_steps:
-                status_info = self.get_status_locked()
-                return {
-                    "message": "Simulation is already completed for the 24-hour duration. Reset to run again.",
-                    "status": "COMPLETED",
-                    "current_step": status_info["current_step"],
-                    "current_time": status_info["current_time"],
-                    "details": {"steps_advanced": 0, "trades_cleared": 0},
-                }
+                # If 24-hour simulation was completed, restart from 00:00 to run continuously again
+                self._reset_internal(
+                    num_households=self.num_households,
+                    random_seed=self.random_seed,
+                )
 
             self.step_delay = max(0.1, step_delay)
             self._stop_event.clear()
@@ -159,15 +169,15 @@ class SimulationService:
         run_trading: bool = True,
         num_households: Optional[int] = None,
         random_seed: Optional[int] = None,
-        continuous: bool = False,
+        continuous: Optional[bool] = None,
         step_delay: float = 1.0,
     ) -> Dict:
         """Start or advance the digital twin simulation.
         
-        If continuous is True, starts background server daemon loop.
+        If continuous is True (or continuous is not False and steps is None), starts background server daemon loop.
         If steps is provided, advances specified number of steps synchronously.
         """
-        if continuous or (steps is None and continuous is not False and not steps):
+        if continuous is True or (steps is None and continuous is not False):
             return self.start_continuous(step_delay=step_delay, run_trading=run_trading)
 
         with self._lock:
@@ -287,6 +297,7 @@ class SimulationService:
                 random_seed=random_seed,
             )
         )
+        self._ensure_prosumer_households()
         self.matcher = DoubleAuctionMatcher()
         self.blockchain = Blockchain(validator_id="poa-validator-primary")
         self.settlement = SettlementEngine(blockchain=self.blockchain)

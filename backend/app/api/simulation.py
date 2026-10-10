@@ -37,6 +37,8 @@ def start_simulation(
         run_trading=request.run_trading,
         num_households=request.num_households,
         random_seed=request.random_seed,
+        continuous=request.continuous,
+        step_delay=request.step_delay or 1.0,
     )
     return SimulationActionResponse(**result)
 

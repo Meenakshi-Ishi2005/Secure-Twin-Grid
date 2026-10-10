@@ -53,11 +53,14 @@ export default function DashboardPage({
   onSelectHouseholdById,
   onSelectBlock
 }) {
-  // Fixed user household ID based on authenticated user -> household mapping
+  // Household ID based on authenticated user -> household mapping
   const households = householdsData?.households || [];
   const myHouseholdId = useMemo(() => {
     return getNormalizedHouseholdId(currentUser?.household_id, households);
   }, [currentUser, households]);
+
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(null);
+  const activeHouseholdId = selectedHouseholdId || myHouseholdId;
 
   const [tradeViewMode, setTradeViewMode] = useState('all'); // 'my' | 'all'
   const [showCalculationHelp, setShowCalculationHelp] = useState(false);
@@ -66,10 +69,10 @@ export default function DashboardPage({
   const [selectedTradeExplanation, setSelectedTradeExplanation] = useState(null);
   const [tradeSearchTerm, setTradeSearchTerm] = useState('');
 
-  // Selected Household Object (Your Home - Fixed to authenticated household)
+  // Selected Household Object (Your Home - Switchable via selector)
   const myHousehold = useMemo(() => {
-    return households.find((h) => h.household_id === myHouseholdId) || households[0] || null;
-  }, [households, myHouseholdId]);
+    return households.find((h) => h.household_id === activeHouseholdId) || households[0] || null;
+  }, [households, activeHouseholdId]);
 
   // Household Dynamic Metrics (Current Step)
   const myGenKw = myHousehold?.current_generation_kw ?? 0;
@@ -103,9 +106,9 @@ export default function DashboardPage({
 
   // Trades involving my household
   const myTrades = useMemo(() => {
-    if (!myHouseholdId) return [];
-    return trades.filter((t) => t.seller_id === myHouseholdId || t.buyer_id === myHouseholdId);
-  }, [trades, myHouseholdId]);
+    if (!activeHouseholdId) return [];
+    return trades.filter((t) => t.seller_id === activeHouseholdId || t.buyer_id === activeHouseholdId);
+  }, [trades, activeHouseholdId]);
 
   const displayedTrades = useMemo(() => {
     const baseList = tradeViewMode === 'my' ? myTrades : trades;
@@ -161,7 +164,7 @@ export default function DashboardPage({
           labels: chartLabels,
           datasets: [
             {
-              label: `My Solar Produced (kW) [${myHouseholdId?.replace('HH-', 'Home ')}]`,
+              label: `My Solar Produced (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
               data: hhGenData,
               borderColor: '#06b6d4',
               backgroundColor: 'rgba(6, 182, 212, 0.18)',
@@ -171,7 +174,7 @@ export default function DashboardPage({
               pointRadius: history.length > 30 ? 0 : 2,
             },
             {
-              label: `My Electricity Used (kW) [${myHouseholdId?.replace('HH-', 'Home ')}]`,
+              label: `My Electricity Used (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
               data: hhConData,
               borderColor: '#10b981',
               backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -188,8 +191,8 @@ export default function DashboardPage({
         labels: chartLabels,
         datasets: [
           {
-            label: 'My Solar Produced (kW)',
-            data: [0, 0, 0.4, 2.8, 4.2, 3.4, 0.6, 0, 0],
+            label: `My Solar Produced (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
+            data: solarCap > 0 ? [0, 0, 0.4, 2.8, 4.2, 3.4, 0.6, 0, 0] : [0, 0, 0, 0, 0, 0, 0, 0, 0],
             borderColor: '#06b6d4',
             backgroundColor: 'rgba(6, 182, 212, 0.18)',
             fill: true,
@@ -197,7 +200,7 @@ export default function DashboardPage({
             borderWidth: 2,
           },
           {
-            label: 'My Electricity Used (kW)',
+            label: `My Electricity Used (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
             data: [0.6, 0.5, 1.2, 1.8, 1.9, 1.5, 2.8, 2.1, 0.9],
             borderColor: '#10b981',
             backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -261,7 +264,7 @@ export default function DashboardPage({
         },
       ],
     };
-  }, [history, chartLabels, chartViewMode, myHousehold, totalHouseholdsCount, myHouseholdId]);
+  }, [history, chartLabels, chartViewMode, myHousehold, totalHouseholdsCount, activeHouseholdId]);
 
   const chartOptions = {
     responsive: true,
@@ -338,8 +341,11 @@ export default function DashboardPage({
           <div className="flex items-center gap-2 shrink-0 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
             <span className="text-xs text-slate-400">Household:</span>
             <select
-              value={myHouseholdId}
-              onChange={(e) => onSelectHouseholdById && onSelectHouseholdById(e.target.value)}
+              value={activeHouseholdId}
+              onChange={(e) => {
+                setSelectedHouseholdId(e.target.value);
+                onSelectHouseholdById && onSelectHouseholdById(e.target.value);
+              }}
               className="bg-slate-900 border border-cyan-700/60 rounded-lg px-2.5 py-1 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
             >
               {households.length > 0 ? (
@@ -349,7 +355,7 @@ export default function DashboardPage({
                   </option>
                 ))
               ) : (
-                <option value={myHouseholdId}>{myHouseholdId ? myHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
+                <option value={activeHouseholdId}>{activeHouseholdId ? activeHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
               )}
             </select>
           </div>
@@ -368,7 +374,7 @@ export default function DashboardPage({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-extrabold text-white">
-                  YOUR HOME — {myHouseholdId?.replace('HH-', 'HOME ')}
+                  YOUR HOME — {activeHouseholdId?.replace('HH-', 'HOME ')}
                 </h2>
                 <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-800/50">
                   {currentTime}
@@ -588,7 +594,7 @@ export default function DashboardPage({
 
             <div className="flex items-center gap-2 p-2.5 rounded-xl bg-cyan-950 border border-cyan-700/60 text-cyan-200 font-bold">
               <Zap className="w-4 h-4 text-cyan-400" />
-              <span>Your Home ({myHouseholdId?.replace('HH-', 'Home ')})</span>
+              <span>Your Home ({activeHouseholdId?.replace('HH-', 'Home ')})</span>
             </div>
 
             <span className="text-slate-500 font-sans">&rarr;</span>
@@ -865,7 +871,7 @@ export default function DashboardPage({
                       <ArrowLeftRight className="w-8 h-8 text-slate-600" />
                       <p className="text-sm font-medium text-slate-400">
                         {tradeViewMode === 'my'
-                          ? `No completed trades recorded for ${myHouseholdId?.replace('HH-', 'Home ')} yet.`
+                          ? `No completed trades recorded for ${activeHouseholdId?.replace('HH-', 'Home ')} yet.`
                           : 'No completed community trades yet.'}
                       </p>
                       <p className="text-xs text-slate-500">
@@ -901,7 +907,7 @@ export default function DashboardPage({
                       >
                         <Store className="w-3 h-3" />
                         <span>{trade.seller_id?.replace('HH-', 'Home ')}</span>
-                        {trade.seller_id === myHouseholdId && <span className="text-[9px] text-cyan-400 font-mono">(You)</span>}
+                        {trade.seller_id === activeHouseholdId && <span className="text-[9px] text-cyan-400 font-mono">(You)</span>}
                       </button>
                     </td>
 
@@ -920,7 +926,7 @@ export default function DashboardPage({
                       >
                         <ShoppingBag className="w-3 h-3" />
                         <span>{trade.buyer_id?.replace('HH-', 'Home ')}</span>
-                        {trade.buyer_id === myHouseholdId && <span className="text-[9px] text-cyan-400 font-mono">(You)</span>}
+                        {trade.buyer_id === activeHouseholdId && <span className="text-[9px] text-cyan-400 font-mono">(You)</span>}
                       </button>
                     </td>
 
@@ -1000,7 +1006,7 @@ export default function DashboardPage({
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-white">
               {chartViewMode === 'household'
-                ? `Your Energy Today — ${myHouseholdId?.replace('HH-', 'Home ')}`
+                ? `Your Energy Today — ${activeHouseholdId?.replace('HH-', 'Home ')}`
                 : 'Community Energy Overview — All 100 Homes'}
             </h2>
             <p className="text-xs text-slate-400">

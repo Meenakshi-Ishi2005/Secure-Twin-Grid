@@ -73,6 +73,16 @@ class SimulationEngine:
                 2
             )
 
+            # Ensure designated user prosumer households (HH-001 and HH-006) have solar PV and battery
+            if hid in ("HH-001", "HH-006"):
+                if not has_solar or solar_cap <= 0:
+                    has_solar = True
+                    solar_cap = 5.25
+                if not has_battery or battery_cap <= 0:
+                    has_battery = True
+                    battery_cap = 9.50
+                    battery_level = 4.75
+
             hh = Household(
                 household_id=hid,
                 community_id=self.config.community_id,

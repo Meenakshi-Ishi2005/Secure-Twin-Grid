@@ -14,6 +14,14 @@ class SimulationStartRequest(BaseModel):
         True,
         description="Whether to automatically clear P2P electricity trades on each simulated interval"
     )
+    continuous: Optional[bool] = Field(
+        None,
+        description="Whether to run continuously in background worker thread"
+    )
+    step_delay: Optional[float] = Field(
+        1.0,
+        description="Step delay in seconds between simulation intervals in continuous mode"
+    )
     num_households: Optional[int] = Field(
         None,
         description="Re-initialize with a specific number of households if resetting",

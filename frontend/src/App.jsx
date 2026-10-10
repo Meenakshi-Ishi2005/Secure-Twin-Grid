@@ -173,9 +173,14 @@ export default function App() {
   const handleStartSimulation = async (steps = null) => {
     setIsOperating(true);
     try {
-      const res = await api.startSimulation({ steps, run_trading: true });
+      const isContinuous = steps === null || steps === undefined;
+      const res = await api.startSimulation({
+        steps: isContinuous ? null : steps,
+        continuous: isContinuous,
+        run_trading: true
+      });
       await fetchAllData();
-      showNotification(res.message || 'Simulation advanced successfully.');
+      showNotification(res.message || 'Simulation started successfully.');
     } catch (err) {
       showNotification(err.message || 'Failed to start simulation', 'error');
     } finally {

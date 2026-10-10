@@ -8,12 +8,14 @@
  */
 export function getNormalizedHouseholdId(rawId, householdsList = []) {
   if (!rawId) {
-    return householdsList[0]?.household_id || 'HH-001';
+    const solarHh = householdsList.find((h) => h.has_solar);
+    return solarHh?.household_id || householdsList[0]?.household_id || 'HH-002';
   }
 
   const cleanId = String(rawId).trim();
   if (!cleanId) {
-    return householdsList[0]?.household_id || 'HH-001';
+    const solarHh = householdsList.find((h) => h.has_solar);
+    return solarHh?.household_id || householdsList[0]?.household_id || 'HH-002';
   }
 
   // Determine available fleet size (default 100 households)

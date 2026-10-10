@@ -72,6 +72,9 @@ def _migrate_and_seed_db():
                 db.add(admin_user)
                 db.commit()
                 logger.info("Default administrator 'sys_admin' seeded successfully.")
+            elif admin_user.household_id in (None, "HH-001"):
+                admin_user.household_id = "ADMIN-CTRL"
+                db.commit()
 
             # Seed default approved prosumer (bob_prosumer) if none exists
             prosumer_user = db.query(User).filter(User.username == "bob_prosumer").first()

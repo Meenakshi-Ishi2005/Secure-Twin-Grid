@@ -44,9 +44,12 @@ export default function EnergyPage({
     return getNormalizedHouseholdId(currentUser?.household_id, households);
   }, [currentUser, households]);
 
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(null);
+  const activeHouseholdId = selectedHouseholdId || myHouseholdId;
+
   const myHousehold = useMemo(() => {
-    return households.find((h) => h.household_id === myHouseholdId) || households[0] || null;
-  }, [households, myHouseholdId]);
+    return households.find((h) => h.household_id === activeHouseholdId) || households[0] || null;
+  }, [households, activeHouseholdId]);
 
   // Household-level dynamic metrics (Current timestep)
   const myGenKw = myHousehold?.current_generation_kw ?? 0;
@@ -100,7 +103,7 @@ export default function EnergyPage({
           labels: chartLabels,
           datasets: [
             {
-              label: `My Solar Generated (kW) [${myHouseholdId?.replace('HH-', 'Home ')}]`,
+              label: `My Solar Generated (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
               data: hhGenData,
               borderColor: '#06b6d4',
               backgroundColor: 'rgba(6, 182, 212, 0.2)',
@@ -110,7 +113,7 @@ export default function EnergyPage({
               pointRadius: history.length > 30 ? 1 : 2,
             },
             {
-              label: `My Electricity Used (kW) [${myHouseholdId?.replace('HH-', 'Home ')}]`,
+              label: `My Electricity Used (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
               data: hhConData,
               borderColor: '#10b981',
               backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -127,8 +130,8 @@ export default function EnergyPage({
         labels: chartLabels,
         datasets: [
           {
-            label: 'My Solar Generated (kW)',
-            data: [0, 0, 0.4, 2.8, 4.2, 3.4, 0.6, 0, 0],
+            label: `My Solar Generated (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
+            data: solarCap > 0 ? [0, 0, 0.4, 2.8, 4.2, 3.4, 0.6, 0, 0] : [0, 0, 0, 0, 0, 0, 0, 0, 0],
             borderColor: '#06b6d4',
             backgroundColor: 'rgba(6, 182, 212, 0.2)',
             fill: true,
@@ -136,7 +139,7 @@ export default function EnergyPage({
             borderWidth: 2,
           },
           {
-            label: 'My Electricity Used (kW)',
+            label: `My Electricity Used (kW) [${activeHouseholdId?.replace('HH-', 'Home ')}]`,
             data: [0.6, 0.5, 1.2, 1.8, 1.9, 1.5, 2.8, 2.1, 0.9],
             borderColor: '#10b981',
             backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -200,7 +203,7 @@ export default function EnergyPage({
         },
       ],
     };
-  }, [history, chartLabels, chartViewMode, myHousehold, totalHouseholdsCount, myHouseholdId]);
+  }, [history, chartLabels, chartViewMode, myHousehold, totalHouseholdsCount, activeHouseholdId]);
 
   const chartOptions = {
     responsive: true,
@@ -274,8 +277,11 @@ export default function EnergyPage({
         <div className="flex items-center gap-2 shrink-0 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
           <span className="text-xs text-slate-400">Household:</span>
           <select
-            value={myHouseholdId}
-            onChange={(e) => onSelectHouseholdById && onSelectHouseholdById(e.target.value)}
+            value={activeHouseholdId}
+            onChange={(e) => {
+              setSelectedHouseholdId(e.target.value);
+              onSelectHouseholdById && onSelectHouseholdById(e.target.value);
+            }}
             className="bg-slate-900 border border-cyan-700/60 rounded-lg px-2.5 py-1 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
           >
             {households.length > 0 ? (
@@ -285,7 +291,7 @@ export default function EnergyPage({
                 </option>
               ))
             ) : (
-              <option value={myHouseholdId}>{myHouseholdId ? myHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
+              <option value={activeHouseholdId}>{activeHouseholdId ? activeHouseholdId.replace('HH-', 'Home ') : 'Home 001'}</option>
             )}
           </select>
         </div>
@@ -303,7 +309,7 @@ export default function EnergyPage({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-extrabold text-white">
-                  YOUR HOME — {myHouseholdId?.replace('HH-', 'HOME ')}
+                  YOUR HOME — {activeHouseholdId?.replace('HH-', 'HOME ')}
                 </h2>
                 <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-800/50">
                   {currentTime}
@@ -478,7 +484,7 @@ export default function EnergyPage({
           <div>
             <h2 className="text-base sm:text-lg font-extrabold text-white">
               {chartViewMode === 'household'
-                ? `Solar Generation vs Electricity Usage (${myHouseholdId?.replace('HH-', 'Home ')})`
+                ? `Solar Generation vs Electricity Usage (${activeHouseholdId?.replace('HH-', 'Home ')})`
                 : 'Community Solar Generation vs Electricity Usage (100 Homes)'}
             </h2>
             <p className="text-xs text-slate-400">
